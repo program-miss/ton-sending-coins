@@ -1,10 +1,18 @@
 import "@stdlib/deploy";
+message Withdraw {
+    amount: Int as coins;
+}
 
 contract SendTon with Deployable {
     const minTonForStorage: Int = ton("0.01"); // 1KB на 2,5 года
     owner: Address;
     init(){
         self.owner = sender();
+    }
+
+     fun onlyOwner() {
+        // если false => ошибка
+        require(sender() == self.owner, "only owner is allowed to withdraw");
     }
 
     receive(){
@@ -32,8 +40,7 @@ contract SendTon with Deployable {
 
     // Выводим все деньги с контракта и оставляем 0 баланс => нет денег для аренды => контракт будет удален
     receive("withdraw all"){
-        // если false => ошибка
-        require(sender() == self.owner, "only owner is allowed to withdraw");
+        self.onlyOwner();
         send(SendParameters{
                 to: sender(),
                 bounce: true,
@@ -47,12 +54,31 @@ contract SendTon with Deployable {
     }
 
     receive("withdraw safe"){
-        require(sender() == self.owner, "only owner is allowed to withdraw");
+        self.onlyOwner();
         send(SendParameters{
                 to: sender(),
                 bounce: true,
                 // все деньги на контракте - деньги, приходящие в сообщении - минимальное значение TON для аренды
                 value: ((myBalance() - context().value) - self.minTonForStorage),
+                mode: (SendIgnoreErrors + SendRemainingValue)
+            }
+        );
+    }
+
+    receive(msg: Withdraw){
+        self.onlyOwner();
+        // В случае, если баланс текущего смарт-контракта - отправленная сумма в сообщении (для комиссии) - минимальное значение для storage,
+        // будет меньше, чем тот amount, который мы хотим вывести по итогу,
+        // то мы не дадим вывести этот amount
+        // мы выведем столько, сколько сможем себе позволить
+        let amount: Int = min(msg.amount, ((myBalance() - context().value) - self.minTonForStorage));
+        require(amount > 0, "Insufficient balance"); // недостаточный баланс
+        send(SendParameters{
+                to: sender(),
+                bounce: true,
+                value: amount,
+                // Для того, чтобы не оставлять у себя деньги, которые не должны оставаться
+                // Чтобы деньги, которые шли за комиссию, они оплатили комиссию и вернулись назад
                 mode: (SendIgnoreErrors + SendRemainingValue)
             }
         );
