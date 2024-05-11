@@ -78,4 +78,38 @@ describe('SendTon', () => {
 
         expect(balanceAfterDeployer).toBeGreaterThan(balanceBeforeDeployer);
     });
+
+    it('should withdraw safe', async () => {
+        const user = await blockchain.treasury('user');
+        const balanceBeforeUser = await user.getBalance();
+
+        await sendTon.send(
+            user.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            'withdraw safe',
+        );
+
+        const balanceAfterUser = await user.getBalance();
+
+        expect(balanceBeforeUser).toBeGreaterThanOrEqual(balanceAfterUser);
+
+        const balanceBeforeDeployer = await deployer.getBalance();
+
+        await sendTon.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.2'),
+            },
+            'withdraw safe',
+        );
+
+        const balanceAfterDeployer = await deployer.getBalance();
+
+        expect(balanceAfterDeployer).toBeGreaterThan(balanceBeforeDeployer);
+
+        const contactBalance = await sendTon.getBalance();
+        expect(contactBalance).toBeGreaterThan(0n);
+    });
 });

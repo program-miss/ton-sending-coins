@@ -1,6 +1,7 @@
 import "@stdlib/deploy";
 
 contract SendTon with Deployable {
+    const minTonForStorage: Int = ton("0.01"); // 1KB на 2,5 года
     owner: Address;
     init(){
         self.owner = sender();
@@ -29,6 +30,7 @@ contract SendTon with Deployable {
         // context().raw; // Slice
     }
 
+    // Выводим все деньги с контракта и оставляем 0 баланс => нет денег для аренды => контракт будет удален
     receive("withdraw all"){
         // если false => ошибка
         require(sender() == self.owner, "only owner is allowed to withdraw");
@@ -44,7 +46,19 @@ contract SendTon with Deployable {
         );
     }
 
-    get fun balance(): String {
-        return myBalance().toCoinsString();
+    receive("withdraw safe"){
+        require(sender() == self.owner, "only owner is allowed to withdraw");
+        send(SendParameters{
+                to: sender(),
+                bounce: true,
+                // все деньги на контракте - деньги, приходящие в сообщении - минимальное значение TON для аренды
+                value: ((myBalance() - context().value) - self.minTonForStorage),
+                mode: (SendIgnoreErrors + SendRemainingValue)
+            }
+        );
+    }
+
+    get fun balance(): Int {
+        return myBalance();
     }
 }
